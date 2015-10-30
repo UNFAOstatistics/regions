@@ -1,0 +1,23 @@
+---
+layout: "`r paste0("default_",region_to_report)`"
+title:  Definitions
+group: "`r paste0("meta_page_",region_to_report)`"
+---
+
+`r paste("# ",region_name)`
+
+
+```{r}
+library(xtable)
+print(
+  xtable(mtcars, caption = "caption here"),
+  html.table.attributes = 'class="table table-striped table-hover"',
+  floating=FALSE,
+  type = "html", table.placement = NULL,
+  booktabs = TRUE,
+  include.rownames = FALSE,
+  size = tbl_font_size,
+  caption.placement = "top"
+  )
+```
+

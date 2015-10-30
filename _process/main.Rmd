@@ -1,0 +1,144 @@
+---
+layout:  "`r paste0("default_",region_to_report)`"
+title:  "`r paste(region_name)`"
+group: regions
+---
+
+`r paste("# ",region_name)`
+
+## Map
+
+```{r  overview, fig.width=11.5, fig.height= 8}
+
+the_whole   <- map.df # for mapping the grey areas
+
+df <- subgrouping(region_to_report = region_to_report, gather=FALSE)
+
+# merge data with the region info
+overview.df <- merge(map.df,df[c("FAOST_CODE","subgroup")],by="FAOST_CODE")
+overview.df <- arrange(overview.df, order)
+#overview.df <- merge(overview.df,FAOcountryProfile,by="FAOST_CODE")
+
+# define map unit
+map_unit <- ""
+
+# graticule
+grat_robin <- spTransform(graticule, CRS("+proj=robin"))  # reproject graticule
+gr_rob <- fortify(grat_robin)
+
+if (region_to_report != "COF"){
+
+source(paste0(root.dir,'./input/code/plot/plot_color.R'))
+
+syb_part <- 1
+
+## Part 1
+colPart1 <- plot_colors(part = syb_part, 6)
+col.main1 <- colPart1[["Main"]][1]
+
+source(paste0(root.dir,"./input/code/plot/theme.R"))
+
+# fill colors for the map
+colPart = plot_colors(part = 1, 12)
+mapColFun = colorRampPalette(c("white", colPart[["Main"]][1]))
+nCol = length(unique(overview.df$subgroup))
+tmpCol = mapColFun(nCol)[2]
+mapColFun = colorRampPalette(c(tmpCol, colPart[["Main"]][2]))
+mapColors = mapColFun(nCol)
+}
+
+
+
+
+
+# Create the plot
+p <- ggplot(data=overview.df, aes(long,lat,group=group))
+#  ---- grid below the countries ------------------------
+p <- p + geom_path(data = gr_rob, aes(long, lat, group = group, fill = NULL),
+              linetype = "solid", color = "grey80", alpha=.5)
+# Grey for the non-data regions
+p <- p + geom_polygon(data=the_whole, fill="grey50", colour = alpha("white", 1/2), size=.4, guide = FALSE)
+p <- p + geom_polygon(aes(fill = subgroup), colour = NA)
+p <- p + geom_polygon(fill=NA,colour = alpha("white", 1/2), size=.4, guide = FALSE)
+# p <- p + scale_fill_manual(values=plot_colors(part = syb_part, length(unique(overview.df$subgroup)))[["Sub"]])
+# p <- p + scale_fill_manual(values=c("#964B00", # Brown
+#                                     "#A52A2A", # Red-Brown
+#                                     "#9F8170", # Beaver
+#                                     "#C3B091", # Khaki
+#                                     "#F0DC82")) # Buff
+# if (region_to_report == "COF")p <- p + scale_fill_manual(values = wes_palette("Cavalcanti"))
+if (region_to_report == "COF")p <- p + scale_fill_manual(values = c("#8c510a","#d8b365","#f6e8c3","#c7eae5","#5ab4ac","#01665e"))
+if (region_to_report != "COF")p <- p + scale_fill_manual(values=plot_colors(part = 1, length(unique(overview.df$subgroup)))[["Sub"]])
+p <- p + theme(legend.position = c(0.05,0.05),
+                          legend.justification=c(0,0),
+                          legend.key.size=unit(6,'mm'),
+                          legend.direction = "vertical",
+                          legend.background=element_rect(colour=NA, fill=alpha("white", 1/3)),
+                          #legend.background=element_rect(colour=NA, fill=NA),
+                          legend.text=element_text(size=12),
+                          legend.title=element_text(size=12),
+                          title=element_text(size=16),
+                          panel.background = element_blank(),
+                          plot.background = element_blank(),
+                          panel.grid.minor = element_blank(),
+                          panel.grid.major = element_blank(),
+                          axis.text = element_blank(),
+                          axis.title = element_blank(),
+                          axis.ticks = element_blank())
+p <- p + guides(fill = guide_legend(title = map_unit, family="PT Sans",
+                                     title.position = "top",
+                                     title.hjust=0))
+p <- p + guides(colour=FALSE)
+p
+
+```
+
+
+```{r overview_table, eval=include_overview_tbl, results='asis', cache=cache_overview_tbl}
+
+# Add region key and subset
+if (!(region_to_report %in% c("GLO","COF"))) overview.df <- overview.df[which(overview.df[[region_to_report]]),]
+if (region_to_report %in% "GLO") overview.df <- overview.df; overview.df <- overview.df[!is.na(overview.df$subgroup),]
+if (region_to_report == "COF") overview.df <- overview.df
+
+
+
+df <- overview.df[!duplicated(overview.df[c("SHORT_NAME")]),]
+df <- df[c("SHORT_NAME","subgroup")]
+tbl <- spread(df, subgroup, SHORT_NAME)
+
+overview_data <- data.frame(colx = rep("FAO", 284))
+for (col in 1:ncol(tbl)){
+  vector <- tbl[[col]][!is.na(tbl[[col]])]
+  vector <- sort(vector)
+  if (length(vector) < 284) vector <- c(vector, rep("empty", (284-length(vector))))
+  vector <- as.data.frame(vector)
+  overview_data <- bind_cols(overview_data,vector)
+  names(overview_data)[col+1] <- names(tbl)[col]
+}
+overview_data$colx <- NULL
+
+for (col in 1:ncol(overview_data)){
+  overview_data[[col]][overview_data[[col]] %in% "empty"] <- NA
+}
+overview_data <- overview_data[rowSums(is.na(overview_data))!=ncol(overview_data), ]
+#
+
+
+library(xtable)
+
+print(
+  xtable(overview_data, caption = "Countries included"),
+  html.table.attributes = 'class="table table-striped table-hover"',
+  floating=FALSE,
+  type = "html", table.placement = NULL,
+  booktabs = TRUE,
+  include.rownames = FALSE,
+  size = tbl_font_size,
+  caption.placement = "top"
+  )
+
+
+```
+
+
